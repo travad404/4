@@ -12,24 +12,7 @@ def carregar_tabelas(tabela1_path, tabela2_path):
     gravimetria_data.columns = gravimetria_data.columns.str.strip()
     resumo_fluxo_data.columns = resumo_fluxo_data.columns.str.strip()
 
-    # Validação básica das colunas esperadas
-    colunas_esperadas_gravimetria = [
-        "Tipo de unidade, segundo o município informante", "Papel/Papelão", "Plásticos", 
-        "Vidros", "Metais", "Orgânicos", "Valor energético p/Incineração", 
-        "Redução de peso seco com Podas", "Redução de peso Líquido com Podas"
-    ]
-    validar_tabelas(gravimetria_data, colunas_esperadas_gravimetria)
-
-    colunas_esperadas_resumo = ["UF", "Tipo de unidade, segundo o município informante", "Dom+Pub", "Entulho", "Podas", "Saúde", "Outros"]
-    validar_tabelas(resumo_fluxo_data, colunas_esperadas_resumo)
-
     return gravimetria_data, resumo_fluxo_data
-
-
-def validar_tabelas(df, colunas_esperadas):
-    colunas_faltantes = [col for col in colunas_esperadas if col not in df.columns]
-    if colunas_faltantes:
-        raise ValueError(f"Colunas faltantes: {', '.join(colunas_faltantes)}")
 
 
 # Percentuais para entulhos
@@ -42,21 +25,7 @@ PERCENTUAIS_ENTULHO = {
 }
 
 
-# Funções auxiliares para cálculos
-def calcular_dom_pub(row, gravimetricos):
-    return {
-        "Papel/Papelão": row * gravimetricos.get("Papel/Papelão", 0),
-        "Plásticos": row * gravimetricos.get("Plásticos", 0),
-        "Vidros": row * gravimetricos.get("Vidros", 0),
-        "Metais": row * gravimetricos.get("Metais", 0),
-        "Orgânicos": row * gravimetricos.get("Orgânicos", 0),
-    }
-
-
-def calcular_entulho(row):
-    return {material: row * percentual for material, percentual in PERCENTUAIS_ENTULHO.items()}
-
-
+# Função para calcular o fluxo ajustado
 def calcular_fluxo_ajustado(gravimetria_data, resumo_fluxo_data):
     fluxo_ajustado = []
 
@@ -70,19 +39,19 @@ def calcular_fluxo_ajustado(gravimetria_data, resumo_fluxo_data):
         gravimetricos = gravimetricos.iloc[0]
         ajuste_residuos = {"UF": row["UF"], "Unidade": unidade}
 
-        # Calcular resíduos por tipo
+        # Calcular resíduos
         if "Dom+Pub" in row:
-            ajuste_residuos.update(calcular_dom_pub(row["Dom+Pub"], gravimetricos))
+            ajuste_residuos.update({
+                "Papel/Papelão": row["Dom+Pub"] * gravimetricos.get("Papel/Papelão", 0),
+                "Plásticos": row["Dom+Pub"] * gravimetricos.get("Plásticos", 0),
+                "Vidros": row["Dom+Pub"] * gravimetricos.get("Vidros", 0),
+                "Metais": row["Dom+Pub"] * gravimetricos.get("Metais", 0),
+                "Orgânicos": row["Dom+Pub"] * gravimetricos.get("Orgânicos", 0),
+            })
 
         if "Entulho" in row:
-            ajuste_residuos.update(calcular_entulho(row["Entulho"]))
-
-        if "Saúde" in row and "Valor energético p/Incineração" in gravimetricos:
-            ajuste_residuos["Valor energético (MJ/ton)"] = row["Saúde"] * gravimetricos.get("Valor energético p/Incineração", 0)
-
-        if "Podas" in row:
-            ajuste_residuos["Redução Peso Seco"] = row["Podas"] * gravimetricos.get("Redução de peso seco com Podas", 0)
-            ajuste_residuos["Redução Peso Líquido"] = row["Podas"] * gravimetricos.get("Redução de peso Líquido com Podas", 0)
+            for material, percentual in PERCENTUAIS_ENTULHO.items():
+                ajuste_residuos[material] = row["Entulho"] * percentual
 
         fluxo_ajustado.append(ajuste_residuos)
 
@@ -105,25 +74,21 @@ if tabela1_path and tabela2_path:
 
         fluxo_ajustado = calcular_fluxo_ajustado(gravimetria_data, resumo_fluxo_data)
 
-        # Métricas resumidas
+        # Exibição de métricas
         st.header("Resumo dos Indicadores")
         total_residuos = fluxo_ajustado.filter(regex="Papel|Plásticos|Vidros|Metais|Orgânicos|Concreto|Argamassa").sum().sum()
-        total_entulho = fluxo_ajustado.filter(regex="Concreto|Argamassa|Tijolo").sum().sum()
+        st.metric("Total de Resíduos Processados (ton)", f"{total_residuos:,.2f}")
 
-        col1, col2 = st.columns(2)
-        col1.metric("Total de Resíduos Processados (ton)", f"{total_residuos:,.2f}")
-        col2.metric("Total de Entulho Processado (ton)", f"{total_entulho:,.2f}")
-
-        # Resultados detalhados
+        # Exibição de tabela
         st.header("📈 Resultados Detalhados")
         st.dataframe(fluxo_ajustado)
 
-        # Gráficos interativos
-        if "Redução Peso Seco" in fluxo_ajustado and "Redução Peso Líquido" in fluxo_ajustado:
-            st.subheader("📍 Redução de Peso")
-            reducao_peso = fluxo_ajustado.groupby("UF")[["Redução Peso Seco", "Redução Peso Líquido"]].sum().reset_index()
-            fig_peso = px.bar(reducao_peso, x="UF", y=["Redução Peso Seco", "Redução Peso Líquido"], barmode="stack")
-            st.plotly_chart(fig_peso, use_container_width=True)
+        # Gráficos
+        st.header("📊 Gráficos")
+        if "Concreto" in fluxo_ajustado:
+            grafico = fluxo_ajustado.groupby("UF")[["Concreto", "Argamassa", "Tijolo"]].sum().reset_index()
+            fig = px.bar(grafico, x="UF", y=["Concreto", "Argamassa", "Tijolo"], title="Entulho por UF")
+            st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Erro: {str(e)}")
+        st.error(f"Erro ao processar os dados: {str(e)}")
