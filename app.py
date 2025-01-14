@@ -1,4 +1,5 @@
-pip install -r requirements.txt
+pip install plotly
+python -c "import plotly.express as px; print('Plotly está funcionando')"
 
 import pandas as pd
 import streamlit as st
