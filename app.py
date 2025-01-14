@@ -103,4 +103,4 @@ with abas[2]:
 # Aba 4: Anexo G
 with abas[3]:
     st.header("Anexo G")
-    st.image("1c.png", caption="Exemplo: Anexo G", use_column_width=True)
+    st.image("1g.png", caption="Exemplo: Anexo G", use_column_width=True)
