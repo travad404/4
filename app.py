@@ -14,43 +14,68 @@ limites_por_estado = {
 # Título do aplicativo
 st.title("Classificação de Gerador de Resíduos e Resíduos - ABNT NBR 10004:2004")
 
-# Perguntar o estado
-estado = st.selectbox("Selecione o estado:", list(limites_por_estado.keys()))
+# Criar abas
+abas = st.tabs(["Classificação de Resíduos", "Anexo A", "Anexo B", "Anexo G"])
 
-# Perguntar quantidade de resíduos gerados
-quantidade = st.number_input("Informe a quantidade de resíduos gerados por dia (em kg):", min_value=0)
+# Aba 1: Classificação de Resíduos
+with abas[0]:
+    # Perguntar o estado
+    estado = st.selectbox("Selecione o estado:", list(limites_por_estado.keys()))
 
-# Verificar se é um grande gerador
-limite = limites_por_estado[estado]
-grande_gerador = quantidade > limite
+    # Perguntar quantidade de resíduos gerados
+    quantidade = st.number_input("Informe a quantidade de resíduos gerados por dia (em kg):", min_value=0)
 
-if grande_gerador:
-    st.warning(f"Você é considerado um GRANDE GERADOR de resíduos no estado de {estado}.")
-else:
-    st.success(f"Você NÃO é considerado um grande gerador de resíduos no estado de {estado}.")
+    # Verificar se é um grande gerador
+    limite = limites_por_estado[estado]
+    grande_gerador = quantidade > limite
 
-# Pergunta 1: Origem do resíduo
-origem_conhecida = st.radio(
-    "O resíduo tem origem conhecida?",
-    ("Sim", "Não")
-)
+    if grande_gerador:
+        st.warning(f"Você é considerado um GRANDE GERADOR de resíduos no estado de {estado}.")
+    else:
+        st.success(f"Você NÃO é considerado um grande gerador de resíduos no estado de {estado}.")
 
-if origem_conhecida == "Sim":
-    # Pergunta 2: Consta nos anexos A ou B?
-    consta_anexos = st.radio(
-        "O resíduo consta nos anexos A ou B?",
+    # Pergunta 1: Origem do resíduo
+    origem_conhecida = st.radio(
+        "O resíduo tem origem conhecida?",
         ("Sim", "Não")
     )
-    
-    if consta_anexos == "Sim":
-        st.error("O resíduo é classificado como PERIGOSO (Classe I).")
+
+    if origem_conhecida == "Sim":
+        # Pergunta 2: Consta nos anexos A ou B?
+        consta_anexos = st.radio(
+            "O resíduo consta nos anexos A ou B?",
+            ("Sim", "Não")
+        )
+
+        if consta_anexos == "Sim":
+            st.error("O resíduo é classificado como PERIGOSO (Classe I).")
+        else:
+            # Pergunta 3: Tem características de periculosidade?
+            perigoso = st.radio(
+                "O resíduo tem características de: inflamabilidade, corrosividade, reatividade, toxicidade ou patogenicidade?",
+                ("Sim", "Não")
+            )
+
+            if perigoso == "Sim":
+                st.error("O resíduo é classificado como PERIGOSO (Classe I).")
+            else:
+                # Pergunta 4: Possui constituintes solubilizados em concentrações superiores ao anexo G?
+                solubilidade = st.radio(
+                    "O resíduo possui constituintes que são solubilizados em concentrações superiores ao anexo G?",
+                    ("Sim", "Não")
+                )
+
+                if solubilidade == "Sim":
+                    st.warning("O resíduo é classificado como NÃO PERIGOSO - NÃO INERTE (Classe II A).")
+                else:
+                    st.success("O resíduo é classificado como NÃO PERIGOSO - INERTE (Classe II B).")
     else:
-        # Pergunta 3: Tem características de periculosidade?
+        # Pergunta 3 (para origem desconhecida): Tem características de periculosidade?
         perigoso = st.radio(
             "O resíduo tem características de: inflamabilidade, corrosividade, reatividade, toxicidade ou patogenicidade?",
             ("Sim", "Não")
         )
-        
+
         if perigoso == "Sim":
             st.error("O resíduo é classificado como PERIGOSO (Classe I).")
         else:
@@ -59,28 +84,23 @@ if origem_conhecida == "Sim":
                 "O resíduo possui constituintes que são solubilizados em concentrações superiores ao anexo G?",
                 ("Sim", "Não")
             )
-            
+
             if solubilidade == "Sim":
                 st.warning("O resíduo é classificado como NÃO PERIGOSO - NÃO INERTE (Classe II A).")
             else:
                 st.success("O resíduo é classificado como NÃO PERIGOSO - INERTE (Classe II B).")
-else:
-    # Pergunta 3 (para origem desconhecida): Tem características de periculosidade?
-    perigoso = st.radio(
-        "O resíduo tem características de: inflamabilidade, corrosividade, reatividade, toxicidade ou patogenicidade?",
-        ("Sim", "Não")
-    )
-    
-    if perigoso == "Sim":
-        st.error("O resíduo é classificado como PERIGOSO (Classe I).")
-    else:
-        # Pergunta 4: Possui constituintes solubilizados em concentrações superiores ao anexo G?
-        solubilidade = st.radio(
-            "O resíduo possui constituintes que são solubilizados em concentrações superiores ao anexo G?",
-            ("Sim", "Não")
-        )
-        
-        if solubilidade == "Sim":
-            st.warning("O resíduo é classificado como NÃO PERIGOSO - NÃO INERTE (Classe II A).")
-        else:
-            st.success("O resíduo é classificado como NÃO PERIGOSO - INERTE (Classe II B).")
+
+# Aba 2: Anexo A
+with abas[1]:
+    st.header("Anexo A")
+    st.image("1a.png", caption="Exemplo: Anexo A", use_column_width=True)
+
+# Aba 3: Anexo B
+with abas[2]:
+    st.header("Anexo B")
+    st.image("1b.png", caption="Exemplo: Anexo B", use_column_width=True)
+
+# Aba 4: Anexo G
+with abas[3]:
+    st.header("Anexo G")
+    st.image("1c.png", caption="Exemplo: Anexo G", use_column_width=True)
