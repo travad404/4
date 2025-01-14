@@ -1,94 +1,62 @@
-import pandas as pd
 import streamlit as st
-import plotly.express as px
 
-# Função para carregar e validar os dados
-@st.cache_data
-def carregar_tabelas(tabela1_path, tabela2_path):
-    gravimetria_data = pd.read_excel(tabela1_path)
-    resumo_fluxo_data = pd.read_excel(tabela2_path)
-
-    # Limpando espaços nos nomes das colunas
-    gravimetria_data.columns = gravimetria_data.columns.str.strip()
-    resumo_fluxo_data.columns = resumo_fluxo_data.columns.str.strip()
-
-    return gravimetria_data, resumo_fluxo_data
-
-
-# Percentuais para entulhos
-PERCENTUAIS_ENTULHO = {
-    "Concreto": 0.0677, "Argamassa": 0.1065, "Tijolo": 0.078, "Madeira": 0.0067,
-    "Papel": 0.0023, "Plástico": 0.0034, "Metal": 0.0029, "Material agregado": 0.0484,
-    "Terra bruta": 0.0931, "Pedra": 0.00192, "Caliça Retida": 0.3492,
-    "Caliça Peneirada": 0.2, "Cerâmica": 0.0161, "Material orgânico e galhos": 0.0087,
-    "Outros": 0
+# Dicionário com os limites por estado
+limites_por_estado = {
+    "Acre": 300, "Alagoas": 100, "Amapá": 200, "Amazonas": 200,
+    "Bahia": 300, "Ceará": 100, "Distrito Federal": 120, "Espírito Santo": 200,
+    "Goiás": 120, "Maranhão": 200, "Mato Grosso": 200, "Mato Grosso do Sul": 200,
+    "Minas Gerais": 200, "Pará": 200, "Paraíba": 200, "Paraná": 100,
+    "Pernambuco": 100, "Piauí": 120, "Rio de Janeiro": 120, "Rio Grande do Norte": 200,
+    "Rio Grande do Sul": 300, "Rondônia": 200, "Roraima": 200, "Santa Catarina": 120,
+    "São Paulo": 200, "Sergipe": 200, "Tocantins": 120
 }
 
+# Título do aplicativo
+st.title("Classificação de Gerador de Resíduos")
 
-# Função para calcular o fluxo ajustado
-def calcular_fluxo_ajustado(gravimetria_data, resumo_fluxo_data):
-    fluxo_ajustado = []
+# Perguntar o estado
+estado = st.selectbox("Selecione o estado:", list(limites_por_estado.keys()))
 
-    for _, row in resumo_fluxo_data.iterrows():
-        unidade = row["Tipo de unidade, segundo o município informante"]
-        gravimetricos = gravimetria_data[gravimetria_data["Tipo de unidade, segundo o município informante"] == unidade]
+# Perguntar quantidade de resíduos gerados
+quantidade = st.number_input("Informe a quantidade de resíduos gerados por dia (em kg):", min_value=0)
 
-        if gravimetricos.empty:
-            continue
+# Verificar se é um grande gerador
+limite = limites_por_estado[estado]
+grande_gerador = quantidade > limite
 
-        gravimetricos = gravimetricos.iloc[0]
-        ajuste_residuos = {"UF": row["UF"], "Unidade": unidade}
+# Classificação dos resíduos com base em perguntas adicionais
+st.write("Agora, vamos classificar os resíduos gerados.")
 
-        # Calcular resíduos
-        if "Dom+Pub" in row:
-            ajuste_residuos.update({
-                "Papel/Papelão": row["Dom+Pub"] * gravimetricos.get("Papel/Papelão", 0),
-                "Plásticos": row["Dom+Pub"] * gravimetricos.get("Plásticos", 0),
-                "Vidros": row["Dom+Pub"] * gravimetricos.get("Vidros", 0),
-                "Metais": row["Dom+Pub"] * gravimetricos.get("Metais", 0),
-                "Orgânicos": row["Dom+Pub"] * gravimetricos.get("Orgânicos", 0),
-            })
+# Perguntar se consta nos anexos A ou B
+consta_anexos = st.radio("O resíduo consta nos anexos A ou B?", ("Sim", "Não"))
 
-        if "Entulho" in row:
-            for material, percentual in PERCENTUAIS_ENTULHO.items():
-                ajuste_residuos[material] = row["Entulho"] * percentual
+# Perguntar características de periculosidade
+perigoso = st.radio(
+    "O resíduo apresenta características de inflamabilidade, corrosividade, reatividade, toxicidade ou patogenicidade?",
+    ("Sim", "Não")
+)
 
-        fluxo_ajustado.append(ajuste_residuos)
+# Perguntar sobre solubilidade em concentrações superiores ao anexo G
+solubilidade = st.radio(
+    "O resíduo possui constituintes que são solubilizados em concentrações superiores ao anexo G?",
+    ("Sim", "Não")
+)
 
-    return pd.DataFrame(fluxo_ajustado)
+# Lógica de classificação
+if st.button("Classificar"):
+    # Verificar grande gerador
+    if grande_gerador:
+        st.warning(f"Você é considerado um grande gerador de resíduos no estado de {estado}.")
+    else:
+        st.success(f"Você NÃO é considerado um grande gerador de resíduos no estado de {estado}.")
 
-
-# Aplicação Streamlit
-st.set_page_config(page_title="Gestão de Resíduos", layout="wide")
-st.title("📊 Gestão de Resíduos Sólidos Urbanos")
-st.sidebar.header("Configurações de Entrada")
-
-# Upload de arquivos
-tabela1_path = st.sidebar.file_uploader("Carregue a Tabela 1 (Gravimetria por Tipo de Unidade)", type=["xlsx"])
-tabela2_path = st.sidebar.file_uploader("Carregue a Tabela 2 (Resumo por Unidade e UF)", type=["xlsx"])
-
-if tabela1_path and tabela2_path:
-    try:
-        gravimetria_data, resumo_fluxo_data = carregar_tabelas(tabela1_path, tabela2_path)
-        st.success("✅ Tabelas carregadas com sucesso!")
-
-        fluxo_ajustado = calcular_fluxo_ajustado(gravimetria_data, resumo_fluxo_data)
-
-        # Exibição de métricas
-        st.header("Resumo dos Indicadores")
-        total_residuos = fluxo_ajustado.filter(regex="Papel|Plásticos|Vidros|Metais|Orgânicos|Concreto|Argamassa").sum().sum()
-        st.metric("Total de Resíduos Processados (ton)", f"{total_residuos:,.2f}")
-
-        # Exibição de tabela
-        st.header("📈 Resultados Detalhados")
-        st.dataframe(fluxo_ajustado)
-
-        # Gráficos
-        st.header("📊 Gráficos")
-        if "Concreto" in fluxo_ajustado:
-            grafico = fluxo_ajustado.groupby("UF")[["Concreto", "Argamassa", "Tijolo"]].sum().reset_index()
-            fig = px.bar(grafico, x="UF", y=["Concreto", "Argamassa", "Tijolo"], title="Entulho por UF")
-            st.plotly_chart(fig, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"Erro ao processar os dados: {str(e)}")
+    # Classificação de periculosidade
+    if perigoso == "Sim":
+        st.error("O resíduo gerado é classificado como PERIGOSO (Classe I).")
+    else:
+        if consta_anexos == "Sim":
+            st.info("O resíduo gerado é classificado como NÃO PERIGOSO - NÃO INERTE (Classe II A).")
+        elif solubilidade == "Sim":
+            st.info("O resíduo gerado é classificado como NÃO PERIGOSO - NÃO INERTE (Classe II A).")
+        else:
+            st.success("O resíduo gerado é classificado como NÃO PERIGOSO - INERTE (Classe II B).")
