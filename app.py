@@ -23,7 +23,7 @@ with abas[0]:
     estado = st.selectbox("Selecione o estado:", list(limites_por_estado.keys()))
 
     # Perguntar quantidade de resíduos gerados
-    quantidade = st.number_input("Informe a quantidade de resíduos gerados por dia (em kg):", min_value=0)
+    quantidade = st.number_input("Informe a quantidade de resíduos gerados por dia (em litros):", min_value=0)
 
     # Verificar se é um grande gerador
     limite = limites_por_estado[estado]
